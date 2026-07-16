@@ -50,9 +50,13 @@ async def chat(
     x_concierge_password: str | None = Header(default=None),
 ) -> ChatResponse:
     # Shared-password gate: if a password is configured, every chat request must
-    # present it. Returns 401 so the frontend can prompt for it.
-    if config.PASSWORD and x_concierge_password != config.PASSWORD:
-        raise HTTPException(status_code=401, detail="Invalid or missing password.")
+    # present it. Matched case-insensitively and trimmed, so phone keyboards
+    # (auto-capitalization, stray spaces) don't lock people out. Returns 401 so
+    # the frontend can prompt for it.
+    if config.PASSWORD:
+        supplied = (x_concierge_password or "").strip().lower()
+        if supplied != config.PASSWORD.strip().lower():
+            raise HTTPException(status_code=401, detail="Invalid or missing password.")
 
     # A new browser conversation arrives without an id; mint one and echo it
     # back so the client can send it on every follow-up (Task 7).
