@@ -6,10 +6,9 @@
 
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
-# git: to clone the target repo the concierge answers about.
-# ca-certificates: TLS for the clone and for the Anthropic API.
+# ca-certificates: TLS for the Anthropic API.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends git ca-certificates \
+    && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -19,16 +18,15 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN uv sync --no-dev
 
-# Application source.
+# Application source (for running the server).
 COPY app ./app
 COPY static ./static
 
-# Bake a clean, read-only copy of the PUBLIC course repo as the concierge target.
-# Stripping .git keeps the image smaller; the agent only reads files.
-RUN git clone --depth 1 \
-      https://github.com/AI-Maker-Space/The-AI-Engineering-Certification-v1.0.git \
-      /srv/target-repo \
-    && rm -rf /srv/target-repo/.git
+# The concierge answers questions about a target repo. We point it at this app's
+# OWN source — a clean, self-contained snapshot copied from the build context
+# (no .git, no .venv, no .env thanks to .dockerignore). No network needed at
+# build time, so nothing can block the deploy.
+COPY . /srv/target-repo
 
 ENV CONCIERGE_TARGET_REPO=/srv/target-repo \
     CONCIERGE_MODE=agent \
