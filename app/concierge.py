@@ -128,3 +128,77 @@ async def answer(message: str, conversation_id: str) -> str:
             "Sorry — I ran into a problem answering that "
             f"({type(exc).__name__}). Please try again."
         )
+
+
+def _friendly_activity(name: str, tool_input: dict) -> str:
+    """Turn a raw tool call into a short human-readable status line for streaming."""
+    inp = tool_input or {}
+
+    def base(p):
+        return str(p).rsplit("/", 1)[-1] if p else ""
+
+    if name == "Read":
+        return f"Reading {base(inp.get('file_path')) or 'a file'}…"
+    if name == "Grep":
+        return f"Searching for “{inp.get('pattern', '')}”…"
+    if name == "Glob":
+        return f"Finding files matching “{inp.get('pattern', '')}”…"
+    if name.endswith("count_lines"):
+        return f"Counting lines in {base(inp.get('file_path')) or 'a file'}…"
+    if name.endswith("largest_files"):
+        return "Finding the largest files…"
+    return f"Using {name}…"
+
+
+async def answer_stream(message: str, conversation_id: str):
+    """Async generator behind /api/chat/stream (Activity #1: live streaming).
+
+    Yields (event_type, payload) tuples as the agent works:
+      ("tool", {"text": "Reading main.py…"})  — each tool the agent calls
+      ("done", {"reply": ..., "conversation_id": ...})  — the final answer
+    """
+    if config.MODE == "echo":
+        yield "done", {"reply": f"echo: {message}", "conversation_id": conversation_id}
+        return
+
+    resume = get_session_id(conversation_id)
+    options = _build_options(resume=resume)
+
+    reply: str | None = None
+    error_text: str | None = None
+    session_id: str | None = None
+
+    try:
+        async for msg in query(prompt=message, options=options):
+            if isinstance(msg, SystemMessage) and msg.subtype == "init":
+                session_id = msg.data.get("session_id")
+            elif isinstance(msg, AssistantMessage):
+                for block in getattr(msg, "content", []):
+                    name = getattr(block, "name", None)
+                    if name:
+                        logger.info("agent tool call: %s", name)
+                        yield "tool", {"text": _friendly_activity(name, getattr(block, "input", {}))}
+            elif isinstance(msg, ResultMessage):
+                if getattr(msg, "is_error", False):
+                    error_text = msg.result
+                else:
+                    reply = msg.result
+    except Exception as exc:  # noqa: BLE001
+        if reply is None and error_text is None:
+            yield "done", {
+                "reply": (
+                    "Sorry — I ran into a problem answering that "
+                    f"({type(exc).__name__}). Please try again."
+                ),
+                "conversation_id": conversation_id,
+            }
+            return
+
+    if reply is not None and session_id:
+        set_session_id(conversation_id, session_id)
+
+    final = reply if reply is not None else (
+        f"The agent couldn't complete that request: {error_text}"
+        if error_text else "I couldn't produce an answer for that one."
+    )
+    yield "done", {"reply": final, "conversation_id": conversation_id}

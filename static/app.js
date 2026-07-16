@@ -56,7 +56,9 @@ async function sendMessage(text) {
   const pending = addMessage("assistant", "thinking…", { pending: true });
 
   try {
-    const res = await fetch("/api/chat", {
+    // Stream the agent's work via Server-Sent Events (Activity #1). We use
+    // fetch (not EventSource) so we can POST a body and send the password header.
+    const res = await fetch("/api/chat/stream", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -74,20 +76,55 @@ async function sendMessage(text) {
       await enforceGate();
       return;
     }
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
+    if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
 
-    // Adopt the server's conversation id (it mints one on the first message).
-    if (data.conversation_id) {
-      conversationId = data.conversation_id;
-      sessionStorage.setItem("conversation_id", conversationId);
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      // SSE frames are separated by a blank line.
+      const frames = buffer.split("\n\n");
+      buffer = frames.pop(); // keep the trailing partial frame
+      for (const frame of frames) {
+        const evt = parseSSE(frame);
+        if (!evt) continue;
+        if (evt.event === "tool") {
+          // Live status: show what the agent is doing right now.
+          pending.textContent = "🔧 " + evt.data.text;
+        } else if (evt.event === "done") {
+          if (evt.data.conversation_id) {
+            conversationId = evt.data.conversation_id;
+            sessionStorage.setItem("conversation_id", conversationId);
+          }
+          pending.classList.remove("msg--pending");
+          pending.textContent = evt.data.reply;
+        }
+      }
     }
-
-    pending.classList.remove("msg--pending");
-    pending.textContent = data.reply;
   } catch (err) {
     pending.classList.remove("msg--pending");
     pending.textContent = `⚠️ Could not reach the server (${err.message}).`;
+  }
+}
+
+// Parse one SSE frame ("event: <type>\ndata: <json>") into {event, data}.
+function parseSSE(frame) {
+  let event = "message";
+  let dataStr = "";
+  for (const line of frame.split("\n")) {
+    if (line.startsWith("event:")) event = line.slice(6).trim();
+    else if (line.startsWith("data:")) dataStr += line.slice(5).trim();
+  }
+  if (!dataStr) return null;
+  try {
+    return { event, data: JSON.parse(dataStr) };
+  } catch {
+    return null;
   }
 }
 

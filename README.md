@@ -3,7 +3,9 @@
 A chat web app powered by the **Claude Agent SDK**. Point it at any repository on
 disk and ask questions about it in the browser — the answers come from a
 read-only agent that reads, greps, and globs the code, plus a couple of custom
-tools. Built for Session 11 of the AI Engineering Certification.
+tools. The UI **streams the agent's tool activity live** ("🔧 Reading `main.py`…")
+via Server-Sent Events while it works. Built for Session 11 of the AI Engineering
+Certification.
 
 ```
 browser chat UI  ──POST /api/chat──▶  FastAPI  ──▶  concierge.answer()  ──▶  Claude Agent SDK
