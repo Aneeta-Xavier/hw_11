@@ -4,7 +4,7 @@ import json
 import uuid
 from pathlib import Path
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -35,35 +35,20 @@ async def index() -> FileResponse:
 
 @app.get("/api/health")
 async def health() -> dict:
-    # `gated` tells the frontend whether to show the password screen. The
-    # password itself is never exposed.
     return {
         "status": "ok",
         "mode": config.MODE,
-        "gated": bool(config.PASSWORD),
         "target_repo": str(config.TARGET_REPO),
     }
 
 
-def _check_password(supplied: str | None) -> None:
-    """Enforce the shared-password gate. Case-insensitive and trimmed so phone
-    keyboards (auto-capitalization, stray spaces) don't lock people out."""
-    if config.PASSWORD:
-        if (supplied or "").strip().lower() != config.PASSWORD.strip().lower():
-            raise HTTPException(status_code=401, detail="Invalid or missing password.")
-
-
 @app.post("/api/chat/stream")
-async def chat_stream(
-    req: ChatRequest,
-    x_concierge_password: str | None = Header(default=None),
-) -> StreamingResponse:
+async def chat_stream(req: ChatRequest) -> StreamingResponse:
     """Server-Sent Events version of /api/chat (Activity #1: live streaming).
 
     Streams the agent's tool activity to the browser as it works, then a final
-    `done` event with the reply. Same password gate as /api/chat.
+    `done` event with the reply.
     """
-    _check_password(x_concierge_password)
     conversation_id = req.conversation_id or str(uuid.uuid4())
 
     async def event_source():
@@ -78,14 +63,9 @@ async def chat_stream(
 
 
 @app.post("/api/chat", response_model=ChatResponse)
-async def chat(
-    req: ChatRequest,
-    x_concierge_password: str | None = Header(default=None),
-) -> ChatResponse:
+async def chat(req: ChatRequest) -> ChatResponse:
     # Non-streaming endpoint (kept for simple clients / curl). The browser UI
     # uses /api/chat/stream instead.
-    _check_password(x_concierge_password)
-
     # A new browser conversation arrives without an id; mint one and echo it
     # back so the client can send it on every follow-up (Task 7).
     conversation_id = req.conversation_id or str(uuid.uuid4())

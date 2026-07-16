@@ -81,12 +81,11 @@ allowlist the agent cannot modify the filesystem no matter what a user types.
 | `CONCIERGE_TARGET_REPO` | cwd | Absolute path of the repo to answer about. |
 | `CONCIERGE_MAX_TURNS` | `25` | Hard cap on agent-loop turns per request. |
 | `CONCIERGE_MODE` | `agent` | `agent` = real SDK loop; `echo` = echo stub. |
-| `CONCIERGE_PASSWORD` | — | If set, visitors must enter this shared password to chat. |
 | `ANTHROPIC_API_KEY` | — | Required in `agent` mode. |
 
 ## Deploying
 
 A `Dockerfile` and `railway.json` are included. The image installs the app,
-clones the public course repo as the concierge's target, and runs uvicorn on
-`$PORT`. Set `ANTHROPIC_API_KEY` (and optionally `CONCIERGE_PASSWORD`) as
-service variables on your host — never bake secrets into the image.
+bundles its own source as the concierge's target, and runs uvicorn on `$PORT`.
+Set `ANTHROPIC_API_KEY` as a service variable on your host — never bake secrets
+into the image.

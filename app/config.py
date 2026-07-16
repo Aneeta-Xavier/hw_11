@@ -42,7 +42,3 @@ except ValueError:
 # "echo" replaces it with a trivial echo — lets you verify the web plumbing
 # end-to-end without an API key. This is the "swappable stub" seam.
 MODE: str = _env("CONCIERGE_MODE", "agent").lower()
-
-# Optional shared password. When set, /api/chat requires it (so a public URL
-# can't spend your API credits). Blank = open, no gate.
-PASSWORD: str = _env("CONCIERGE_PASSWORD", "")
