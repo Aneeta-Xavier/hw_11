@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Codebase Concierge</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <div id="gate" class="gate" hidden>
+      <form id="gate-form" class="gate__card">
+        <h2 class="gate__title">Codebase Concierge</h2>
+        <p class="gate__hint">Enter the password to continue.</p>
+        <input
+          id="gate-input"
+          class="gate__input"
+          type="password"
+          autocomplete="off"
+          placeholder="Password"
+          aria-label="Password"
+        />
+        <p id="gate-error" class="gate__error" hidden>Incorrect password. Try again.</p>
+        <button class="gate__submit" type="submit">Unlock</button>
+      </form>
+    </div>
+
+    <main class="app">
+      <header class="app__header">
+        <h1>Codebase Concierge</h1>
+        <p class="app__subtitle">Ask questions about the repository.</p>
+      </header>
+
+      <section id="messages" class="messages" aria-live="polite"></section>
+
+      <form id="composer" class="composer">
+        <input
+          id="input"
+          class="composer__input"
+          type="text"
+          autocomplete="off"
+          placeholder="Ask about this repo…"
+          aria-label="Message"
+        />
+        <button id="send" class="composer__send" type="submit">Send</button>
+      </form>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
